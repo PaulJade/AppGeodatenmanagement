@@ -32,11 +32,12 @@ public class MainActivity extends AppCompatActivity {
     private TextView myTextView;
     private TextView zugriff;
     private Button myButton;
+    private Button myAusgabeButton;
     private String name = "Name";
     private static final int REQUEST_CODE = 100;
     FusedLocationProviderClient fusedLocationProviderClient;
-
-
+    Boolean erfolgreich = null;
+    String fehler = "";
     private double latitude = 0;
     private double longitude = 0;
     private String zeit = "2023-07-28 12:34:56+02";
@@ -47,15 +48,20 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
+
         myTextView = findViewById(R.id.nameTextfeld);
         myButton = findViewById(R.id.button);
         zugriff = findViewById((R.id.standortZugriffText));
-        myButton.setOnClickListener(new View.OnClickListener() {
 
+
+        myButton.setOnClickListener(new View.OnClickListener() {
+        Boolean erfolgreich = null;
             @Override
             public void onClick(View v) {
 
                 System.out.println(myTextView.getText());
+                name = myTextView.getText().toString();
+                System.out.println(name);
                 //sendLocation();
                 getLastLocation();
             }
@@ -94,12 +100,26 @@ public class MainActivity extends AppCompatActivity {
                     System.out.println(latitude);
                     System.out.println(longitude);
                     System.out.println(zeit);
-                    try {
-                        send2Postgis(longitude, latitude, zeit);
-                    } catch (SQLException throwables) {
-                        System.out.println("Verbindung fehlgeschlagen");
-                        throwables.printStackTrace();
-                    }
+                    new Thread(new Runnable() {
+                        public void run() {
+                            try {
+                                send2Postgis(longitude, latitude, zeit);
+                                erfolgreich = true;
+                                //myTextView.setText("Erfolgreich");
+                            } catch (SQLException throwables) {
+                                System.out.println("Verbindung fehlgeschlagen");
+                                erfolgreich = false;
+                                //myTextView.setText("Verbindung fehlgeschlagen");
+                                fehler = throwables.getMessage();
+                                throwables.printStackTrace();
+                            }
+                            // A potentially time consuming task.
+
+
+                        }
+                    }).start();
+
+
 
                 }else {
                     System.out.println("location = null");
@@ -123,3 +143,5 @@ public class MainActivity extends AppCompatActivity {
     }
 
 }
+
+

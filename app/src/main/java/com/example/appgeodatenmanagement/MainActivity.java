@@ -9,6 +9,8 @@ import android.location.Address;
 import android.location.Geocoder;
 import android.location.Location;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.view.View;
 import android.widget.Button;
 import android.widget.TextView;
@@ -20,6 +22,7 @@ import com.google.android.gms.tasks.OnSuccessListener;
 import java.io.IOException;
 import java.sql.Connection;
 import java.sql.DriverManager;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.text.SimpleDateFormat;
@@ -32,7 +35,6 @@ public class MainActivity extends AppCompatActivity {
     private TextView myTextView;
     private TextView zugriff;
     private Button myButton;
-    private Button myAusgabeButton;
     private String name = "Name";
     private static final int REQUEST_CODE = 100;
     FusedLocationProviderClient fusedLocationProviderClient;
@@ -42,6 +44,13 @@ public class MainActivity extends AppCompatActivity {
     private double longitude = 0;
     private String zeit = "2023-07-28 12:34:56+02";
 
+    //Textviews
+    private TextView longiLast;
+    private TextView latiiLast;
+    private TextView datiLast;
+
+    Handler uiHandler;
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -49,9 +58,16 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main);
 
 
+        uiHandler = new Handler(Looper.getMainLooper());
+
         myTextView = findViewById(R.id.nameTextfeld);
         myButton = findViewById(R.id.button);
-        zugriff = findViewById((R.id.standortZugriffText));
+        zugriff = findViewById((R.id.textView2));
+        zugriff.setVisibility(View.INVISIBLE);
+
+        longiLast = findViewById(R.id.longi);
+        latiiLast = findViewById(R.id.lati);
+        datiLast = findViewById(R.id.datum);
 
 
         myButton.setOnClickListener(new View.OnClickListener() {
@@ -63,7 +79,10 @@ public class MainActivity extends AppCompatActivity {
                 name = myTextView.getText().toString();
                 System.out.println(name);
                 //sendLocation();
+
                 getLastLocation();
+
+
             }
         });
 
@@ -77,58 +96,97 @@ public class MainActivity extends AppCompatActivity {
     }
 
     public void getLastLocation(){
-        System.out.println("Methode startet");
-        sendLocation();
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED){
-            System.out.println("Methode geht in if");
-            fusedLocationProviderClient.getLastLocation().addOnSuccessListener(this, location -> {
-                if (location != null) {
+        for (int i = 0; i< 3; i++) {
 
-                    System.out.println(location.getLatitude());
-                    latitude = location.getLatitude();
-                    longitude = location.getLongitude();
+            System.out.println("Methode startet");
 
-                    Date currentDate = new Date();
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+                System.out.println("Methode geht in if");
+                fusedLocationProviderClient.getLastLocation().addOnSuccessListener(this, location -> {
+                    if (location != null) {
 
-                    // Gewünschtes Datumsformat definieren
-                    SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+                        System.out.println(location.getLatitude());
+                        latitude = location.getLatitude();
+                        longitude = location.getLongitude();
 
-                    // Zeitpunkt im gewünschten Format erhalten
-                    String formattedDate = dateFormat.format(currentDate);
-                    zeit = formattedDate;
+                        Date currentDate = new Date();
 
-                    System.out.println(latitude);
-                    System.out.println(longitude);
-                    System.out.println(zeit);
-                    new Thread(new Runnable() {
-                        public void run() {
-                            try {
-                                send2Postgis(longitude, latitude, zeit);
-                                erfolgreich = true;
-                                //myTextView.setText("Erfolgreich");
-                            } catch (SQLException throwables) {
-                                System.out.println("Verbindung fehlgeschlagen");
-                                erfolgreich = false;
-                                //myTextView.setText("Verbindung fehlgeschlagen");
-                                fehler = throwables.getMessage();
-                                throwables.printStackTrace();
+
+                        // Gewünschtes Datumsformat definieren
+                        SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+
+                        // Zeitpunkt im gewünschten Format erhalten
+                        String formattedDate = dateFormat.format(currentDate);
+                        zeit = formattedDate;
+
+                        System.out.println(latitude);
+                        System.out.println(longitude);
+                        System.out.println(zeit);
+                        longiLast.setText(" " + longitude);
+                        latiiLast.setText(" " + latitude);
+                        datiLast.setText(" " + zeit);
+
+
+                        new Thread(new Runnable() {
+                            public void run() {
+                                try {
+                                    send2Postgis(longitude, latitude, zeit);
+                                    erfolgreich = true;
+                                    //Das hier müsste eig dafür sorgen, dass bei jedem Durchlauf
+
+
+                                    runOnUiThread(new Runnable() {
+                                        @Override
+                                        public void run() {
+                                            System.out.println("geht in RunUI");
+                                            longiLast.setText(" " + longitude);
+                                            latiiLast.setText(" " + latitude);
+                                            datiLast.setText(" " + zeit);
+                                        }
+                                    });
+
+
+
+
+
+                                    //myTextView.setText("Erfolgreich");
+                                } catch (SQLException throwables) {
+
+                                    erfolgreich = false;
+                                    //myTextView.setText("Verbindung fehlgeschlagen");
+                                    fehler = throwables.getMessage();
+                                    throwables.printStackTrace();
+                                }
+
+                                // A potentially time consuming task.
+
+
                             }
-                            // A potentially time consuming task.
+                        }).start();
 
 
+                        try {
+                            Thread.sleep(10000);
+                        } catch (InterruptedException e) {
+                            e.printStackTrace();
                         }
-                    }).start();
 
 
+                        System.out.println("Text sollte gesetzt werden");
+                        longiLast.setText(" " + longitude);
+                        latiiLast.setText(" " + latitude);
+                        datiLast.setText(" " + zeit);
 
-                }else {
-                    System.out.println("location = null");
-                }
 
-            });
-        } else            {
-            zugriff.setVisibility(View.VISIBLE);
-            System.out.println("hallo");
+                    } else {
+                        System.out.println("location = null");
+                    }
+
+                });
+            } else {
+                zugriff.setVisibility(View.VISIBLE);
+                System.out.println("hallo");
+            }
         }
     }
 
@@ -139,8 +197,17 @@ public class MainActivity extends AppCompatActivity {
                 "x"
                 );
 
+        Statement anweisung = db.createStatement();
+        String sql = "INSERT INTO spatiotemporal_data (geom, timestamp, name) VALUES (ST_SetSRID(ST_MakePoint("+ longitude+ "," +  latitude + "), 4326), '"+ zeit + "', '" + name + "')";
+        System.out.println(sql);
+        int erg = anweisung.executeUpdate(sql);
+
+        anweisung.close();
+
         System.out.println("Verbindung erfolgreich");
     }
+
+
 
 }
 

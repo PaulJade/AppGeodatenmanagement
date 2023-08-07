@@ -18,8 +18,12 @@ import android.widget.TextView;
 import com.google.android.gms.location.FusedLocationProviderClient;
 import com.google.android.gms.location.LocationServices;
 import com.google.android.gms.tasks.OnSuccessListener;
+import com.google.gson.JsonObject;
 
 import java.io.IOException;
+import java.io.OutputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
@@ -49,6 +53,9 @@ public class MainActivity extends AppCompatActivity {
     private TextView latiiLast;
     private TextView datiLast;
 
+
+
+
     Handler uiHandler;
 
 
@@ -70,17 +77,15 @@ public class MainActivity extends AppCompatActivity {
         datiLast = findViewById(R.id.datum);
 
 
+
         myButton.setOnClickListener(new View.OnClickListener() {
-        Boolean erfolgreich = null;
+
             @Override
             public void onClick(View v) {
 
                 System.out.println(myTextView.getText());
-                name = myTextView.getText().toString();
-                System.out.println(name);
-                //sendLocation();
 
-                getLastLocation();
+                getLastLocationAPI();
 
 
             }
@@ -90,13 +95,61 @@ public class MainActivity extends AppCompatActivity {
 
     }
 
-    public void sendLocation(){
+    public void sendLocation() {
         System.out.println("Status");
         System.out.println(ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION));
     }
 
-    public void getLastLocation(){
-        for (int i = 0; i< 3; i++) {
+
+    public void getLastLocationAPI(){
+        for (int i = 0; i < 3; i++) {
+
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+                fusedLocationProviderClient.getLastLocation().addOnSuccessListener(this, location -> {
+                    if (location != null) {
+
+                        System.out.println(location.getLatitude());
+                        latitude = location.getLatitude();
+                        longitude = location.getLongitude();
+
+                        Date currentDate = new Date();
+                        // Gewünschtes Datumsformat definieren
+                        SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+
+                        // Zeitpunkt im gewünschten Format erhalten
+                        String formattedDate = dateFormat.format(currentDate);
+                        zeit = formattedDate;
+
+                        longiLast.setText(" " + longitude);
+                        latiiLast.setText(" " + latitude);
+                        datiLast.setText(" " + zeit);
+
+                        System.out.println("JSON Aufbau");
+                        JsonObject insertDB = bouildJSON(latitude, longitude, zeit);
+                        sendJsonToAPI(insertDB);
+
+                        try {
+                            Thread.sleep(10000);
+                        } catch (InterruptedException e) {
+                            e.printStackTrace();
+                        }
+
+                    } else {
+                        System.out.println("location = null");
+                    }
+
+                });
+            } else {
+                zugriff.setVisibility(View.VISIBLE);
+                System.out.println("hallo");
+            }
+        }
+
+
+    }
+
+    public void getLastLocation() {
+        for (int i = 0; i < 3; i++) {
 
             System.out.println("Methode startet");
 
@@ -146,9 +199,6 @@ public class MainActivity extends AppCompatActivity {
                                     });
 
 
-
-
-
                                     //myTextView.setText("Erfolgreich");
                                 } catch (SQLException throwables) {
 
@@ -190,15 +240,15 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    public void send2Postgis (double lat ,double lon , String zeit) throws SQLException {
+    public void send2Postgis(double lat, double lon, String zeit) throws SQLException {
         Connection db = DriverManager.getConnection(
                 "jdbc:postgresql://psql-t-01.fbbgg.hs-woe.de:5435/pnolte",
                 "pnolte",
                 "x"
-                );
+        );
 
         Statement anweisung = db.createStatement();
-        String sql = "INSERT INTO spatiotemporal_data (geom, timestamp, name) VALUES (ST_SetSRID(ST_MakePoint("+ longitude+ "," +  latitude + "), 4326), '"+ zeit + "', '" + name + "')";
+        String sql = "INSERT INTO spatiotemporal_data (geom, timestamp, name) VALUES (ST_SetSRID(ST_MakePoint(" + longitude + "," + latitude + "), 4326), '" + zeit + "', '" + name + "')";
         System.out.println(sql);
         int erg = anweisung.executeUpdate(sql);
 
@@ -207,6 +257,53 @@ public class MainActivity extends AppCompatActivity {
         System.out.println("Verbindung erfolgreich");
     }
 
+    public JsonObject bouildJSON(double lat, double lon, String zeit){
+
+        name = myTextView.getText().toString();
+        System.out.println(zeit + " " + lat + " " + lon + " " + name);
+
+        JsonObject jsonObject = new JsonObject();
+        jsonObject.addProperty("timestamp_with_timezone",zeit);
+        jsonObject.addProperty("geom","POINT("+lat+" "+lon+")");
+        jsonObject.addProperty("name", name);
+
+        return jsonObject;
+    }
+
+    public void sendJsonToAPI(JsonObject jsonObject) {
+
+
+        new Thread(new Runnable() {
+
+            @Override
+            public void run() {
+                System.out.println("Thread gestartet ..");
+                try {
+                    URL url = new URL("http://192.168.0.126:5000/api/room");
+                    HttpURLConnection httpURLConnection = (HttpURLConnection) url.openConnection();
+                    httpURLConnection.setRequestMethod("POST");
+                    httpURLConnection.setRequestProperty("Content-Type", "application/json; utf-8");
+                    httpURLConnection.setRequestProperty("Accept", "application/json");
+                    httpURLConnection.setDoOutput(true);
+
+                    // Sende das JSON-Objekt an die API
+                    try (OutputStream outputStream = httpURLConnection.getOutputStream()) {
+                        byte[] input = jsonObject.toString().getBytes("utf-8");
+                        outputStream.write(input, 0, input.length);
+                    }
+                    System.out.println("Erfolgreich die Daten");
+
+                    // Lese die Antwort von der API
+                    int responseCode = httpURLConnection.getResponseCode();
+                    // Hier kannst du den Response-Code und die Response-Body verarbeiten
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }
+        }).start();
+
+
+    }
 
 
 }

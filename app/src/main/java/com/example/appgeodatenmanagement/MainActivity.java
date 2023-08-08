@@ -1,6 +1,7 @@
 package com.example.appgeodatenmanagement;
 
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
 import android.Manifest;
@@ -8,6 +9,8 @@ import android.content.pm.PackageManager;
 import android.location.Address;
 import android.location.Geocoder;
 import android.location.Location;
+import android.location.LocationListener;
+import android.location.LocationManager;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -53,6 +56,9 @@ public class MainActivity extends AppCompatActivity {
     private TextView latiiLast;
     private TextView datiLast;
 
+    private static final int REQUEST_LOCATION_PERMISSION = 100;
+    private LocationManager locationManager;
+
 
 
 
@@ -83,10 +89,18 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onClick(View v) {
 
-                System.out.println(myTextView.getText());
+                locationManager = (LocationManager) getSystemService(LOCATION_SERVICE);
 
-                getLastLocationAPI();
+                if (ActivityCompat.checkSelfPermission(MainActivity.this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED
+                        && ActivityCompat.checkSelfPermission(MainActivity.this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+                    ActivityCompat.requestPermissions(MainActivity.this, new String[]{Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION}, REQUEST_LOCATION_PERMISSION);
+                } else {
+                    startLocationUpdates();
+                }
 
+                //System.out.println(myTextView.getText());
+
+                //getLastLocationAPI();
 
             }
         });
@@ -112,13 +126,7 @@ public class MainActivity extends AppCompatActivity {
                         latitude = location.getLatitude();
                         longitude = location.getLongitude();
 
-                        Date currentDate = new Date();
-                        // Gewünschtes Datumsformat definieren
-                        SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
 
-                        // Zeitpunkt im gewünschten Format erhalten
-                        String formattedDate = dateFormat.format(currentDate);
-                        zeit = formattedDate;
 
                         longiLast.setText(" " + longitude);
                         latiiLast.setText(" " + latitude);
@@ -260,11 +268,11 @@ public class MainActivity extends AppCompatActivity {
     public JsonObject bouildJSON(double lat, double lon, String zeit){
 
         name = myTextView.getText().toString();
-        System.out.println(zeit + " " + lat + " " + lon + " " + name);
+        System.out.println(zeit + " " + lon + " " + lat + " " + name);
 
         JsonObject jsonObject = new JsonObject();
         jsonObject.addProperty("timestamp_with_timezone",zeit);
-        jsonObject.addProperty("geom","POINT("+lat+" "+lon+")");
+        jsonObject.addProperty("geom","POINT("+lon+" "+lat+")");
         jsonObject.addProperty("name", name);
 
         return jsonObject;
@@ -305,6 +313,65 @@ public class MainActivity extends AppCompatActivity {
 
     }
 
+    private void startLocationUpdates() {
+        final Handler handler = new Handler();
+        final Runnable runnable = new Runnable() {
+            @Override
+            public void run() {
+                if (ActivityCompat.checkSelfPermission(MainActivity.this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+                        && ActivityCompat.checkSelfPermission(MainActivity.this, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+
+                    locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 0, 0, locationListener);
+
+                }
+            }
+        };
+
+        handler.post(runnable);
+    }
+
+
+    public String getDateTime(){
+        Date currentDate = new Date();
+        // Gewünschtes Datumsformat definieren
+        SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+
+        // Zeitpunkt im gewünschten Format erhalten
+        String formattedDate = dateFormat.format(currentDate);
+        zeit = formattedDate;
+        return zeit;
+    }
+
+    private final LocationListener locationListener = new LocationListener() {
+        @Override
+        public void onLocationChanged(Location location) {
+            //Toast.makeText(MainActivity.this, "Position: " + location.getLatitude() + ", " + location.getLongitude(), Toast.LENGTH_LONG).show();
+
+
+            System.out.println("10Sek");
+            JsonObject insertDB = bouildJSON(location.getLatitude(), location.getLongitude(), getDateTime());
+            sendJsonToAPI(insertDB);
+
+        }
+
+        // Implement other required methods of LocationListener if needed
+        @Override
+        public void onStatusChanged(String provider, int status, Bundle extras) {}
+        @Override
+        public void onProviderEnabled(String provider) {}
+        @Override
+        public void onProviderDisabled(String provider) {}
+    };
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == REQUEST_LOCATION_PERMISSION) {
+            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                startLocationUpdates();
+            }
+        }
+    }
 
 }
 

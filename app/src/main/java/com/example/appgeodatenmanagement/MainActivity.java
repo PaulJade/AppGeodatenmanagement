@@ -78,9 +78,6 @@ public class MainActivity extends AppCompatActivity {
         zugriff = findViewById((R.id.textView2));
         zugriff.setVisibility(View.INVISIBLE);
 
-        longiLast = findViewById(R.id.longi);
-        latiiLast = findViewById(R.id.lati);
-        datiLast = findViewById(R.id.datum);
 
 
 
@@ -125,8 +122,6 @@ public class MainActivity extends AppCompatActivity {
                         System.out.println(location.getLatitude());
                         latitude = location.getLatitude();
                         longitude = location.getLongitude();
-
-
 
                         longiLast.setText(" " + longitude);
                         latiiLast.setText(" " + latitude);
@@ -287,7 +282,7 @@ public class MainActivity extends AppCompatActivity {
             public void run() {
                 System.out.println("Thread gestartet ..");
                 try {
-                    URL url = new URL("http://192.168.0.126:5000/api/room");
+                    URL url = new URL("http://10.42.20.1:8000/api/addPosition");
                     HttpURLConnection httpURLConnection = (HttpURLConnection) url.openConnection();
                     httpURLConnection.setRequestMethod("POST");
                     httpURLConnection.setRequestProperty("Content-Type", "application/json; utf-8");
@@ -320,7 +315,6 @@ public class MainActivity extends AppCompatActivity {
             public void run() {
                 if (ActivityCompat.checkSelfPermission(MainActivity.this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
                         && ActivityCompat.checkSelfPermission(MainActivity.this, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
-
                     locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 0, 0, locationListener);
 
                 }
@@ -347,9 +341,9 @@ public class MainActivity extends AppCompatActivity {
         public void onLocationChanged(Location location) {
             //Toast.makeText(MainActivity.this, "Position: " + location.getLatitude() + ", " + location.getLongitude(), Toast.LENGTH_LONG).show();
 
-
             System.out.println("10Sek");
             JsonObject insertDB = bouildJSON(location.getLatitude(), location.getLongitude(), getDateTime());
+            System.out.println(insertDB.toString());
             sendJsonToAPI(insertDB);
 
         }

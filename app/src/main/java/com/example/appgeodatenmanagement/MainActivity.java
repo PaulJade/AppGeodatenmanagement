@@ -55,49 +55,35 @@ public class MainActivity extends AppCompatActivity {
     private TextView longiLast;
     private TextView latiiLast;
     private TextView datiLast;
-
     private static final int REQUEST_LOCATION_PERMISSION = 100;
     private LocationManager locationManager;
-
-
-
-
     Handler uiHandler;
-
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-
         uiHandler = new Handler(Looper.getMainLooper());
-
         myTextView = findViewById(R.id.nameTextfeld);
         myButton = findViewById(R.id.button);
         zugriff = findViewById((R.id.textView2));
         zugriff.setVisibility(View.INVISIBLE);
 
-
-
-
         myButton.setOnClickListener(new View.OnClickListener() {
-
             @Override
             public void onClick(View v) {
-
                 locationManager = (LocationManager) getSystemService(LOCATION_SERVICE);
-
+                //Überpruefung der einzelnen Rechte um auf die Position zugreifen zu koennen
                 if (ActivityCompat.checkSelfPermission(MainActivity.this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED
                         && ActivityCompat.checkSelfPermission(MainActivity.this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
                     ActivityCompat.requestPermissions(MainActivity.this, new String[]{Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION}, REQUEST_LOCATION_PERMISSION);
                 } else {
+                    //Aufruf der Methode um die Position zu erfassen
                     startLocationUpdates();
                 }
 
-                //System.out.println(myTextView.getText());
 
-                //getLastLocationAPI();
 
             }
         });
@@ -106,164 +92,9 @@ public class MainActivity extends AppCompatActivity {
 
     }
 
-    public void sendLocation() {
-        System.out.println("Status");
-        System.out.println(ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION));
-    }
-
-
-    public void getLastLocationAPI(){
-        for (int i = 0; i < 3; i++) {
-
-            if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
-                fusedLocationProviderClient.getLastLocation().addOnSuccessListener(this, location -> {
-                    if (location != null) {
-
-                        System.out.println(location.getLatitude());
-                        latitude = location.getLatitude();
-                        longitude = location.getLongitude();
-
-                        longiLast.setText(" " + longitude);
-                        latiiLast.setText(" " + latitude);
-                        datiLast.setText(" " + zeit);
-
-                        System.out.println("JSON Aufbau");
-                        JsonObject insertDB = bouildJSON(latitude, longitude, zeit);
-                        sendJsonToAPI(insertDB);
-
-                        try {
-                            Thread.sleep(10000);
-                        } catch (InterruptedException e) {
-                            e.printStackTrace();
-                        }
-
-                    } else {
-                        System.out.println("location = null");
-                    }
-
-                });
-            } else {
-                zugriff.setVisibility(View.VISIBLE);
-                System.out.println("hallo");
-            }
-        }
-
-
-    }
-
-    public void getLastLocation() {
-        for (int i = 0; i < 3; i++) {
-
-            System.out.println("Methode startet");
-
-            if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
-                System.out.println("Methode geht in if");
-                fusedLocationProviderClient.getLastLocation().addOnSuccessListener(this, location -> {
-                    if (location != null) {
-
-                        System.out.println(location.getLatitude());
-                        latitude = location.getLatitude();
-                        longitude = location.getLongitude();
-
-                        Date currentDate = new Date();
-
-
-                        // Gewünschtes Datumsformat definieren
-                        SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
-
-                        // Zeitpunkt im gewünschten Format erhalten
-                        String formattedDate = dateFormat.format(currentDate);
-                        zeit = formattedDate;
-
-                        System.out.println(latitude);
-                        System.out.println(longitude);
-                        System.out.println(zeit);
-                        longiLast.setText(" " + longitude);
-                        latiiLast.setText(" " + latitude);
-                        datiLast.setText(" " + zeit);
-
-
-                        new Thread(new Runnable() {
-                            public void run() {
-                                try {
-                                    send2Postgis(longitude, latitude, zeit);
-                                    erfolgreich = true;
-                                    //Das hier müsste eig dafür sorgen, dass bei jedem Durchlauf
-
-
-                                    runOnUiThread(new Runnable() {
-                                        @Override
-                                        public void run() {
-                                            System.out.println("geht in RunUI");
-                                            longiLast.setText(" " + longitude);
-                                            latiiLast.setText(" " + latitude);
-                                            datiLast.setText(" " + zeit);
-                                        }
-                                    });
-
-
-                                    //myTextView.setText("Erfolgreich");
-                                } catch (SQLException throwables) {
-
-                                    erfolgreich = false;
-                                    //myTextView.setText("Verbindung fehlgeschlagen");
-                                    fehler = throwables.getMessage();
-                                    throwables.printStackTrace();
-                                }
-
-                                // A potentially time consuming task.
-
-
-                            }
-                        }).start();
-
-
-                        try {
-                            Thread.sleep(10000);
-                        } catch (InterruptedException e) {
-                            e.printStackTrace();
-                        }
-
-
-                        System.out.println("Text sollte gesetzt werden");
-                        longiLast.setText(" " + longitude);
-                        latiiLast.setText(" " + latitude);
-                        datiLast.setText(" " + zeit);
-
-
-                    } else {
-                        System.out.println("location = null");
-                    }
-
-                });
-            } else {
-                zugriff.setVisibility(View.VISIBLE);
-                System.out.println("hallo");
-            }
-        }
-    }
-
-    public void send2Postgis(double lat, double lon, String zeit) throws SQLException {
-        Connection db = DriverManager.getConnection(
-                "jdbc:postgresql://psql-t-01.fbbgg.hs-woe.de:5435/pnolte",
-                "pnolte",
-                "x"
-        );
-
-        Statement anweisung = db.createStatement();
-        String sql = "INSERT INTO spatiotemporal_data (geom, timestamp, name) VALUES (ST_SetSRID(ST_MakePoint(" + longitude + "," + latitude + "), 4326), '" + zeit + "', '" + name + "')";
-        System.out.println(sql);
-        int erg = anweisung.executeUpdate(sql);
-
-        anweisung.close();
-
-        System.out.println("Verbindung erfolgreich");
-    }
-
-    public JsonObject bouildJSON(double lat, double lon, String zeit){
+    public JsonObject buildJSON(double lat, double lon, String zeit){
 
         name = myTextView.getText().toString();
-        System.out.println(zeit + " " + lon + " " + lat + " " + name);
 
         JsonObject jsonObject = new JsonObject();
         jsonObject.addProperty("timestamp_with_timezone",zeit);
@@ -273,16 +104,18 @@ public class MainActivity extends AppCompatActivity {
         return jsonObject;
     }
 
+    /**
+     * Methode um JSON-Objekt an API zu senden
+     * @param jsonObject
+     */
     public void sendJsonToAPI(JsonObject jsonObject) {
-
-
         new Thread(new Runnable() {
-
             @Override
             public void run() {
                 System.out.println("Thread gestartet ..");
+                //Verbindung mit API herstellen
                 try {
-                    URL url = new URL("http://10.42.20.1:8000/api/addPosition");
+                    URL url = new URL("http://192.168.0.126:8000/api/addPosition");
                     HttpURLConnection httpURLConnection = (HttpURLConnection) url.openConnection();
                     httpURLConnection.setRequestMethod("POST");
                     httpURLConnection.setRequestProperty("Content-Type", "application/json; utf-8");
@@ -296,18 +129,19 @@ public class MainActivity extends AppCompatActivity {
                     }
                     System.out.println("Erfolgreich die Daten");
 
-                    // Lese die Antwort von der API
+                    // Lese die Antwort von der APIs
                     int responseCode = httpURLConnection.getResponseCode();
-                    // Hier kannst du den Response-Code und die Response-Body verarbeiten
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
             }
         }).start();
 
-
     }
 
+    /**
+     * Methode zum erfassen der aktuellen Position
+     */
     private void startLocationUpdates() {
         final Handler handler = new Handler();
         final Runnable runnable = new Runnable() {
@@ -325,6 +159,10 @@ public class MainActivity extends AppCompatActivity {
     }
 
 
+    /**
+     * Methode um aktuellen Zeitpunkt zu erfassen
+     * @return
+     */
     public String getDateTime(){
         Date currentDate = new Date();
         // Gewünschtes Datumsformat definieren
@@ -336,16 +174,16 @@ public class MainActivity extends AppCompatActivity {
         return zeit;
     }
 
+    /**
+     * Überschriebene Methode des LocationListeners um konkreten Positionen zu erfassen und zu senden
+     */
     private final LocationListener locationListener = new LocationListener() {
         @Override
         public void onLocationChanged(Location location) {
-            //Toast.makeText(MainActivity.this, "Position: " + location.getLatitude() + ", " + location.getLongitude(), Toast.LENGTH_LONG).show();
-
-            System.out.println("10Sek");
-            JsonObject insertDB = bouildJSON(location.getLatitude(), location.getLongitude(), getDateTime());
-            System.out.println(insertDB.toString());
+            //Methode zum erstellen eines JSON-Objektes mit den benötigten Parametern
+            JsonObject insertDB = buildJSON(location.getLatitude(), location.getLongitude(), getDateTime());
+            //Senden des JSON-Objektes an die API
             sendJsonToAPI(insertDB);
-
         }
 
         // Implement other required methods of LocationListener if needed
